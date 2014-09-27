@@ -1,0 +1,33 @@
+{
+  "name": "acl",
+  "version": "0.0.1",
+  "description": "ACL crawling tools",
+  "keywords": ["acl", "nlp", "crawler"],
+  "homepage": "https://github.com/chbrown/acl",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/chbrown/acl.git"
+  },
+  "bugs": {
+    "email": "Christopher Brown <io@henrian.com>",
+    "url": "http://github.com/chbrown/acl/issues"
+  },
+  "license": "MIT",
+  "author": "Christopher Brown <io@henrian.com> (http://henrian.com)",
+  "dependencies": {
+    "async": "*",
+    "domlike": "*",
+    "htmlparser2": "*",
+    "http-enhanced": "*",
+    "lodash": "*",
+    "loge": "*",
+    "mkdirp": "*",
+    "optimist": "*",
+    "redis": "*",
+    "regex-router": "*",
+    "request": "*",
+    "send": "*",
+    "streaming": "*",
+    "underscore": "*"
+  }
+}

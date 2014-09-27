@@ -1,0 +1,13 @@
+---
+# http://www.aclweb.org/anthology/
+- prefix: P79
+  name: 17th Annual Meeting of the Association for Computational Linguistics
+- prefix: P80
+  name: 18th Annual Meeting of the Association for Computational Linguistics
+- prefix: P81
+  name: 19th Annual Meeting of the Association for Computational Linguistics
+
+- prefix: P04
+  name: Proceedings of the 42nd Annual Meeting of the Association for Computational Linguistics (ACL-04)
+- prefix: P05
+  name: Proceedings of the 43rd Annual Meeting of the Association for Computational Linguistics (ACL’05)
