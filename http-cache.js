@@ -17,7 +17,7 @@ exports.get = function(url, callback) {
   redis_client.get(url, function(err, cached) {
     if (err) return done(err);
 
-    if (cached) {
+    if (cached) { //  && cached.length > 0
       logger.debug('Found %s in cache', url);
       done(null, cached);
     }
@@ -28,8 +28,8 @@ exports.get = function(url, callback) {
         logger.error('Non-200 response', response);
       }
 
-      // expires in 1 hour
-      redis_client.setex(url, 3600, body, function(err) {
+      // expires in 6 hours
+      redis_client.setex(url, 6 * 60*60, body, function(err) {
         if (err) return done(err);
 
         logger.debug('Retrieved %s from web', url);
