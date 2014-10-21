@@ -9,6 +9,7 @@ var mkdirp = require('mkdirp');
 var request = require('request');
 var htmlparser2 = require('htmlparser2');
 var DomlikeHandler = require('domlike/handler');
+var js_yaml = require('js-yaml');
 
 var http_cache = require('./http-cache');
 var text = require('./text');
@@ -42,11 +43,15 @@ var download = function(opts, callback) {
     if (err) return callback(err);
 
     logger.info('GET %s > %s', opts.url, opts.filepath);
-    var stream = fs.createWriteStream(opts.filepath);
-    request.get(opts.url).pipe(stream)
+
+    var req = request.get(opts.url)
     .on('error', function(err) {
-      callback(err);
-    })
+      logger.error('Error downloading %s (skipping)', opts.url);
+      callback();
+    });
+
+    var stream = fs.createWriteStream(opts.filepath);
+    req.pipe(stream)
     .on('finish', function() {
       callback();
     });
@@ -56,43 +61,41 @@ var download = function(opts, callback) {
 
 // ACL specific stuff:
 
-var getACLEntriesFromHtml = function(html, callback) {
+var getACLEntriesFromHtml = function(html, url, callback) {
   /** Parse HTML of ACL page and return list of entries like:
 
       {
         author: 'Kevin Knight; Vasileios Hatzivassiloglou',
         title: 'Two-Level, Many-Paths Generation',
-        pdf_url: 'P95-1034.pdf',
-        bib_url: 'P95-1034.bib',
+        pdf_url: 'http://www.aclweb.org/anthology/P/P95-1034.pdf',
+        bib_url: 'http://www.aclweb.org/anthology/P/P95-1034.bib',
       }
 
-  The returned urls will probably be relative.
+  The attached urls will be absolute.
   */
   var handler = new DomlikeHandler(function(err, document) {
     if (err) return callback(err);
 
     // console.log(util.inspect(document, {depth: 4, colors: true}));
-    var content = document.getElementById('content');
+    var content = document.getElementById('content') || document.getElementsByTagName('body')[0];
 
-    if (!content) return callback(new Error('No #content element'));
+    if (content === undefined) {
+      return callback(new Error('No #content element on ' + url));
+    }
 
     var section = null;
     var entries = [];
     _.each(content.children, function(child) {
-      // console.log('child', util.inspect(child, {depth: 4, colors: true}));
+      // console.log('child: ' + util.inspect(child, {depth: 5, colors: true}));
+      // console.log('child: %j', child);
       if (child.tagName == 'h1') {
         section = child.textContent;
+        // console.error('section: %s', section);
       }
       else if (section !== null) {
         var anchors = child.childNodes.filter(function(node) {
           return node.tagName == 'a';
         });
-
-        // var a_bib = child.querySelector('a[href$="bib"]');
-        var a_bib = child.firstDFS(function(node) {
-          return node.tagName == 'a' && (node.attributes.href || '').match(/bib$/);
-        });
-        var bib_url = a_bib ? a_bib.attributes.href : null;
 
         // var a_pdf = child.querySelector('a[href$="pdf"]');
         var a_pdf = child.firstDFS(function(node) {
@@ -100,13 +103,20 @@ var getACLEntriesFromHtml = function(html, callback) {
         });
         var pdf_url = a_pdf ? a_pdf.attributes.href : null;
 
+        // var a_bib = child.querySelector('a[href$="bib"]');
+        var a_bib = child.firstDFS(function(node) {
+          return node.tagName == 'a' && (node.attributes.href || '').match(/bib$/);
+        });
+        var bib_url = a_bib ? a_bib.attributes.href : null;
+
         var b = child.firstDFS(function(node) { return node.tagName == 'b'; });
         var i = child.firstDFS(function(node) { return node.tagName == 'i'; });
+        // absolute-ize the relative urls; ignore null urls
         var entry = {
           author: b ? b.textContent : 'NA',
           title: i ? i.textContent : 'NA',
-          pdf_url: pdf_url,
-          bib_url: bib_url,
+          pdf_url: pdf_url ? url + pdf_url : pdf_url,
+          bib_url: bib_url ? url + bib_url : bib_url,
         };
         entries.push(entry);
       }
@@ -119,44 +129,6 @@ var getACLEntriesFromHtml = function(html, callback) {
   parser.done();
 };
 
-var getACLEntriesFromUrl = function(url, callback) {
-  /** Fetch ACL page and return list of entries like:
-
-      {
-        author: 'Kevin Knight; Vasileios Hatzivassiloglou',
-        title: 'Two-Level, Many-Paths Generation',
-        pdf_url: 'http://www.aclweb.org/anthology/P/P95-1034.pdf',
-        bib_url: 'http://www.aclweb.org/anthology/P/P95-1034.bib',
-      }
-
-  The attached urls will be absolute.
-  */
-  http_cache.get(url, function(err, html) {
-    if (err) return callback(err);
-
-    getACLEntriesFromHtml(html, function(err, entries) {
-      if (err) {
-        logger.info('Error parsing HTML: %s from URL: %s', html, url);
-        return callback(err);
-      }
-
-      // logger.info('Found %d entries on %s', entries.length, url);
-
-      // absolute-ize the relative urls; ignore null urls
-      entries.map(function(entry) {
-        if (entry.bib_url) {
-          entry.bib_url = url + entry.bib_url;
-        }
-        if (entry.pdf_url) {
-          entry.pdf_url = url + entry.pdf_url;
-        }
-      });
-
-      callback(null, entries);
-    });
-  });
-};
-
 // Actually running it:
 
 function finalize(err) {
@@ -167,29 +139,6 @@ function finalize(err) {
 logger.level = 'INFO';
 
 var anthology_dirpath = path.join(__dirname, 'anthology');
-
-var getAllACLEntries = function(letter, years, callback) {
-  /**
-  letter: String - a single letter
-      P for ACL
-      D for EMNLP
-      etc.
-  years: Array - an array of integers
-  callback: function(Error, list_of_entries)
-
-  P (ACL) has P79 through P14
-  */
-  var url_root = 'http://www.aclweb.org/anthology/' + letter + '/' + letter;
-  async.map(years, function(year, callback) {
-    // e.g., http://www.aclweb.org/anthology/P/P95/
-    getACLEntriesFromUrl(url_root + year.toString().slice(2) + '/', callback);
-  }, function(err, entries) {
-    if (err) return callback(err);
-
-    // flatten out over years
-    callback(null, _.flatten(entries));
-  });
-};
 
 var downloadEntries = function(entries, callback) {
   /**
@@ -216,7 +165,7 @@ var downloadEntries = function(entries, callback) {
   // files is now an array of {url: 'http://...', filepath: '/...'} objects (both PDF/BIB urls)
 
   // fetch at most X at a time
-  async.eachLimit(files, 1, function(file, callback) {
+  async.eachLimit(files, 5, function(file, callback) {
     callIfMissing(file, download, callback);
   }, callback);
 };
@@ -247,8 +196,32 @@ var processEntries = function(entries, callback) {
 };
 
 var main = function(callback) {
-  getAllACLEntries('P', _.range(1979, 2015), function(err, entries) {
+  // getAllACLEntries('P', _.range(1979, 2015), function(err, entries)
+  var conferences_yaml = fs.readFileSync(path.join(__dirname, 'conferences.yaml'));
+  var conferences = js_yaml.load(conferences_yaml);
+  var keys = _(conferences).values().flatten().value();
+
+  // keys = ['D/D02'];
+  logger.info('Crawling %d keys', keys.length);
+
+  async.mapLimit(keys, 100, function(key, callback) {
+    var url = 'http://www.aclweb.org/anthology/' + key + '/';
+    // Fetch ACL page (potentially from cache) and return list of entries like:
+    logger.info('Fetching: %s', url);
+    http_cache.get(url, function(err, html) {
+      if (err) return callback(err);
+
+      getACLEntriesFromHtml(html, url, callback);
+    });
+  }, function(err, keys_entries) {
     if (err) return callback(err);
+
+
+    // flatten out over conferences/years
+    var entries = _.flatten(keys_entries);
+    // console.log(entries);
+
+    logger.info('Found %d entries', entries.length);
 
     downloadEntries(entries, function(err) {
       if (err) return callback(err);
@@ -257,7 +230,10 @@ var main = function(callback) {
         return callback(err);
       });
     });
+
+    // callback(null, entries);
   });
 };
+
 
 main(finalize);

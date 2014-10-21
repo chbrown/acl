@@ -10,15 +10,18 @@
   },
   "bugs": {
     "email": "Christopher Brown <io@henrian.com>",
-    "url": "http://github.com/chbrown/acl/issues"
+    "url": "https://github.com/chbrown/acl/issues"
   },
   "license": "MIT",
   "author": "Christopher Brown <io@henrian.com> (http://henrian.com)",
   "dependencies": {
     "async": "*",
     "domlike": "*",
+    "elasticsearch": "*",
+    "glob": "*",
     "htmlparser2": "*",
     "http-enhanced": "*",
+    "js-yaml": "*",
     "lodash": "*",
     "loge": "*",
     "mkdirp": "*",
