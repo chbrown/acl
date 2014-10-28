@@ -19,7 +19,7 @@ exports.get = function(url, callback) {
 
     if (cached) { //  && cached.length > 0
       logger.debug('Found %s in cache', url);
-      done(null, cached);
+      return done(null, cached);
     }
 
     request.get(url, function(err, response, body) {
