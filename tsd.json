@@ -1,0 +1,42 @@
+{
+  "version": "v4",
+  "repo": "borisyankov/DefinitelyTyped",
+  "ref": "master",
+  "path": "types/ext",
+  "bundle": "types/ext.d.ts",
+  "installed": {
+    "node/node.d.ts": {
+      "commit": "b36ee6a691c2e3c5c3fd0b868f9d764740093db2"
+    },
+    "redis/redis.d.ts": {
+      "commit": "639f974f9d2fbd4809e2df6c5df83ed89f99c7fa"
+    },
+    "request/request.d.ts": {
+      "commit": "639f974f9d2fbd4809e2df6c5df83ed89f99c7fa"
+    },
+    "form-data/form-data.d.ts": {
+      "commit": "639f974f9d2fbd4809e2df6c5df83ed89f99c7fa"
+    },
+    "async/async.d.ts": {
+      "commit": "1a9210fff5becc7aa4aa5e03869e14455285c56b"
+    },
+    "mkdirp/mkdirp.d.ts": {
+      "commit": "1a9210fff5becc7aa4aa5e03869e14455285c56b"
+    },
+    "htmlparser2/htmlparser2.d.ts": {
+      "commit": "1a9210fff5becc7aa4aa5e03869e14455285c56b"
+    },
+    "js-yaml/js-yaml.d.ts": {
+      "commit": "1a9210fff5becc7aa4aa5e03869e14455285c56b"
+    },
+    "lodash/lodash.d.ts": {
+      "commit": "1a9210fff5becc7aa4aa5e03869e14455285c56b"
+    },
+    "glob/glob.d.ts": {
+      "commit": "b36ee6a691c2e3c5c3fd0b868f9d764740093db2"
+    },
+    "minimatch/minimatch.d.ts": {
+      "commit": "b36ee6a691c2e3c5c3fd0b868f9d764740093db2"
+    }
+  }
+}
