@@ -104,17 +104,18 @@ NAACL:
   - N/N12
   - N/N13
 EMNLP:
-  - D/D96
-  - D/D97
-  - D/D98
-  - D/D99
-  - D/D00
-  - D/D01
+  # Most of these redirect to the corresponding workshop, W/W##
+  #- D/D96
+  #- D/D97
+  #- D/D98
+  #- D/D99
+  #- D/D00
+  #- D/D01
   #- D/D02
-  - D/D03
-  - D/D04
+  #- D/D03
+  #- D/D04
   - D/D05
-  - D/D06
+  #- D/D06
   - D/D07
   - D/D08
   - D/D09
