@@ -1,5 +1,4 @@
-/// <reference path="typings/tsd.d.ts" />
-/*jslint node: true */
+/// <reference path="types/all.d.ts" />
 
 import _ = require('lodash');
 import async = require('async');
@@ -13,6 +12,8 @@ import request = require('request');
 
 import tex = require('tex');
 var bibtex = tex.bibtex;
+
+var anthology_root = '/Users/chbrown/github/acl-anthology';
 
 interface ReferenceTag {
   key: string;
@@ -51,7 +52,7 @@ function main(callback: ErrorCallback) {
   Parses them and adds them to the local elasticsearch server,
   using the given citekey as the document's _id
   */
-  new streaming.Walk(path.join(__dirname, 'anthology'))
+  new streaming.Walk(anthology_root)
   .pipe(new streaming.Filter(function(file: File) {
     // file has .path and .stats properties
     return file.path.match(/\/\w\d{2}-\d{4}.bib$/); // && node.stats.isFile();
@@ -64,11 +65,11 @@ function main(callback: ErrorCallback) {
         if (err) return callback(err);
         if (references.length === 0) {
           logger.error('No references in file: %s', file.path);
-          return callback(null, null);
+          return callback(null, {error: true});
         }
         if (references.length !== 1) {
           logger.error('Too many references in file: %s', file.path);
-          return callback(null, null);
+          return callback(null, {error: true});
         }
 
         var reference = references[0];
@@ -83,10 +84,9 @@ function main(callback: ErrorCallback) {
   .pipe(process.stdout);
 }
 
-function finalize(err?: Error) {
-  if (err) throw err;
-
-  logger.info('DONE');
+if (require.main === module) {
+  main(function(err: Error) {
+    if (err) throw err;
+    logger.info('DONE');
+  });
 }
-
-main(finalize);

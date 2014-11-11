@@ -1,12 +1,11 @@
-/// <reference path="typings/tsd.d.ts" />
-/*jslint node: true */
+/// <reference path="types/all.d.ts" />
 var fs = require('fs');
-var path = require('path');
 var streaming = require('streaming');
 var logger = require('loge');
 var request = require('request');
 var tex = require('tex');
 var bibtex = tex.bibtex;
+var anthology_root = '/Users/chbrown/github/acl-anthology';
 function addReference(reference, callback) {
     //logger.info('adding reference: @%s: %s', reference.type, reference.key);
     request.put({
@@ -24,7 +23,7 @@ function main(callback) {
     Parses them and adds them to the local elasticsearch server,
     using the given citekey as the document's _id
     */
-    new streaming.Walk(path.join(__dirname, 'anthology')).pipe(new streaming.Filter(function (file) {
+    new streaming.Walk(anthology_root).pipe(new streaming.Filter(function (file) {
         // file has .path and .stats properties
         return file.path.match(/\/\w\d{2}-\d{4}.bib$/); // && node.stats.isFile();
     })).pipe(new streaming.Queue(10, function (file, callback) {
@@ -36,11 +35,11 @@ function main(callback) {
                     return callback(err);
                 if (references.length === 0) {
                     logger.error('No references in file: %s', file.path);
-                    return callback(null, null);
+                    return callback(null, { error: true });
                 }
                 if (references.length !== 1) {
                     logger.error('Too many references in file: %s', file.path);
-                    return callback(null, null);
+                    return callback(null, { error: true });
                 }
                 var reference = references[0];
                 addReference(reference, function (err, body) {
@@ -52,9 +51,10 @@ function main(callback) {
         });
     })).pipe(new streaming.json.Stringifier()).pipe(process.stdout);
 }
-function finalize(err) {
-    if (err)
-        throw err;
-    logger.info('DONE');
+if (require.main === module) {
+    main(function (err) {
+        if (err)
+            throw err;
+        logger.info('DONE');
+    });
 }
-main(finalize);
