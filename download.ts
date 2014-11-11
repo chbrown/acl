@@ -1,4 +1,4 @@
-/// <reference path="typings/tsd.d.ts" />
+/// <reference path="types/all.d.ts" />
 
 import async = require('async');
 import fs = require('fs');
@@ -16,6 +16,8 @@ import js_yaml = require('js-yaml');
 import http_cache = require('./http-cache');
 import text = require('./text');
 
+var anthology_root = '/Users/chbrown/github/acl-anthology';
+
 function ensureFile(filepath: string, createFunction: (callback: ErrorCallback) => void, callback: ErrorCallback): void {
   /** if no file exists at `filepath`, call `ifMissingFunction(callback)`
   */
@@ -31,26 +33,27 @@ function ensureFile(filepath: string, createFunction: (callback: ErrorCallback) 
 }
 
 function download(url: string, filepath: string, callback: ErrorCallback): void {
-  /** streams `opts.url` into `opts.filepath`
-
-  callback: function(Error | null)
+  /** streams `url` into `filepath`
   */
   var dirpath = path.dirname(filepath);
-  mkdirp(dirpath, function(err) {
+  mkdirp(dirpath, function(err: Error) {
     if (err) return callback(err);
 
     logger.info('GET %s > %s', url, filepath);
 
     var req = request.get(url);
     req.on('error', function(err) {
-      logger.error('Error downloading %s (skipping)', url);
+      logger.error('Error downloading %s', url);
       callback(err);
     });
+    req.on('response', function(res) {
+      if (res.statusCode != 200) return callback(new Error('HTTP response != 200'));
 
-    var stream = fs.createWriteStream(filepath);
-    req.pipe(stream)
-    .on('finish', function() {
-      callback();
+      var stream = fs.createWriteStream(filepath);
+      req.pipe(stream)
+        .on('finish', function() {
+          callback();
+        });
     });
   });
 }
@@ -140,7 +143,6 @@ interface DOMAnchor extends DOMElement {
   href: string;
 }
 
-
 function getACLEntriesFromHtml(html: string, url: string, conference_key: string, callback: (err: Error, entries?: Array<ACLEntry>) => void) {
   /** Parse HTML of ACL page and return list of entries like:
 
@@ -212,47 +214,39 @@ function getACLEntriesFromHtml(html: string, url: string, conference_key: string
   parser.end();
 }
 
-// Actually running it:
-
-function finalize(err: Error) {
-  if (err) throw err;
-  logger.info('DONE');
-}
-
-logger.level = 'INFO';
-
-// var anthology_dirpath = path.join(__dirname, 'anthology');
-
 function downloadEntries(entries: Array<ACLEntry>, callback: (err: Error) => void) {
-  logger.info('Downloading %d entries...', entries.length);
-
-  var anthology_dirpath = path.join(__dirname, 'anthology');
+  logger.info('Extracting individual files from %d entries', entries.length);
 
   var files: Array<StoredWebFile> = [];
   entries.forEach(function(entry) {
     if (entry.bib) {
-      var bib_filepath = path.join(anthology_dirpath, entry.conference_key, entry.bib.filename);
+      var bib_filepath = path.join(anthology_root, entry.conference_key, entry.bib.filename);
       files.push(new StoredWebFile(entry.bib.url, bib_filepath));
     }
     if (entry.pdf) {
-      var pdf_filepath = path.join(anthology_dirpath, entry.conference_key, entry.pdf.filename);
+      var pdf_filepath = path.join(anthology_root, entry.conference_key, entry.pdf.filename);
       files.push(new StoredWebFile(entry.pdf.url, pdf_filepath));
     }
   });
 
-  logger.info('Downloading %d files', files.length);
+  logger.info('Found %d files', files.length);
 
-  // fetch at most X at a time
-  async.eachLimit(files, 1, function(file: StoredWebFile, callback: ErrorCallback) {
-    ensureFile(file.filepath, function(callback) {
-      download(file.url, file.filepath, callback);
-    }, function(err?: Error) {
-      callback(err);
-    });
-  }, callback);
+  async.reject(files, function(file, callback) {
+    fs.exists(file.filepath, callback);
+  }, function(files: Array<StoredWebFile>) { // it should be able to infer the type on files here
+
+    logger.info('Downloading %d files', files.length);
+
+    async.eachLimit(files, 1, function(file: StoredWebFile, callback: ErrorCallback) {
+      download(file.url, file.filepath, function(err) {
+        if (err) logger.error('Error downloading %s: %s', file.url, err);
+        callback();
+      });
+    }, callback);
+  });
 }
 
-var processEntries = function(entries: Array<ACLEntry>, callback: ErrorCallback) {
+function processEntries(entries: Array<ACLEntry>, callback: ErrorCallback) {
   /**
   callback: function(Error | null)
   */
@@ -281,12 +275,12 @@ var processEntries = function(entries: Array<ACLEntry>, callback: ErrorCallback)
       callback();
     });
   }, callback);
-};
+}
 
-var main = function(callback: ErrorCallback) {
+function downloadConferences(callback: ErrorCallback) {
   // getAllACLEntries('P', _.range(1979, 2015), function(err, entries)
-  var conferences_yaml = fs.readFileSync(path.join(__dirname, 'conferences.yaml'));
-  var conferences: { [index: string]: string } = js_yaml.load(conferences_yaml);
+  var conferences_yaml = fs.readFileSync(path.join(__dirname, 'conferences.yaml'), {encoding: 'utf8'});
+  var conferences: StringMap = js_yaml.load(conferences_yaml);
   var conference_keys = _.flatten(_.values(conferences));
   // conference_keys is something like ['P/P90', 'P/P91', ...]
 
@@ -306,7 +300,7 @@ var main = function(callback: ErrorCallback) {
     if (err) return callback(err);
 
     // flatten out over conferences/years
-    var entries = <Array<ACLEntry>>_.flatten(entriess);
+    var entries = _.flatten<ACLEntry>(entriess);
 
     logger.info('Found %d entries', entries.length);
 
@@ -319,7 +313,13 @@ var main = function(callback: ErrorCallback) {
 
     // callback(null, entries);
   });
-};
+}
 
-
-main(finalize);
+if (require.main === module) {
+  // Actually running it:
+  logger.level = 'INFO';
+  downloadConferences(function(err: Error) {
+    if (err) throw err;
+    logger.info('DONE');
+  });
+}

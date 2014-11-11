@@ -1,4 +1,4 @@
-/// <reference path="typings/tsd.d.ts" />
+/// <reference path="types/all.d.ts" />
 var async = require('async');
 var fs = require('fs');
 var path = require('path');
@@ -11,6 +11,7 @@ var htmlparser2 = require('htmlparser2');
 var DomlikeHandler = require('domlike/handler');
 var js_yaml = require('js-yaml');
 var http_cache = require('./http-cache');
+var anthology_root = '/Users/chbrown/github/acl-anthology';
 function ensureFile(filepath, createFunction, callback) {
     /** if no file exists at `filepath`, call `ifMissingFunction(callback)`
     */
@@ -25,9 +26,7 @@ function ensureFile(filepath, createFunction, callback) {
     });
 }
 function download(url, filepath, callback) {
-    /** streams `opts.url` into `opts.filepath`
-  
-    callback: function(Error | null)
+    /** streams `url` into `filepath`
     */
     var dirpath = path.dirname(filepath);
     mkdirp(dirpath, function (err) {
@@ -36,12 +35,16 @@ function download(url, filepath, callback) {
         logger.info('GET %s > %s', url, filepath);
         var req = request.get(url);
         req.on('error', function (err) {
-            logger.error('Error downloading %s (skipping)', url);
+            logger.error('Error downloading %s', url);
             callback(err);
         });
-        var stream = fs.createWriteStream(filepath);
-        req.pipe(stream).on('finish', function () {
-            callback();
+        req.on('response', function (res) {
+            if (res.statusCode != 200)
+                return callback(new Error('HTTP response != 200'));
+            var stream = fs.createWriteStream(filepath);
+            req.pipe(stream).on('finish', function () {
+                callback();
+            });
         });
     });
 }
@@ -150,39 +153,34 @@ function getACLEntriesFromHtml(html, url, conference_key, callback) {
     parser.write(html);
     parser.end();
 }
-// Actually running it:
-function finalize(err) {
-    if (err)
-        throw err;
-    logger.info('DONE');
-}
-logger.level = 'INFO';
-// var anthology_dirpath = path.join(__dirname, 'anthology');
 function downloadEntries(entries, callback) {
-    logger.info('Downloading %d entries...', entries.length);
-    var anthology_dirpath = path.join(__dirname, 'anthology');
+    logger.info('Extracting individual files from %d entries', entries.length);
     var files = [];
     entries.forEach(function (entry) {
         if (entry.bib) {
-            var bib_filepath = path.join(anthology_dirpath, entry.conference_key, entry.bib.filename);
+            var bib_filepath = path.join(anthology_root, entry.conference_key, entry.bib.filename);
             files.push(new StoredWebFile(entry.bib.url, bib_filepath));
         }
         if (entry.pdf) {
-            var pdf_filepath = path.join(anthology_dirpath, entry.conference_key, entry.pdf.filename);
+            var pdf_filepath = path.join(anthology_root, entry.conference_key, entry.pdf.filename);
             files.push(new StoredWebFile(entry.pdf.url, pdf_filepath));
         }
     });
-    logger.info('Downloading %d files', files.length);
-    // fetch at most X at a time
-    async.eachLimit(files, 1, function (file, callback) {
-        ensureFile(file.filepath, function (callback) {
-            download(file.url, file.filepath, callback);
-        }, function (err) {
-            callback(err);
-        });
-    }, callback);
+    logger.info('Found %d files', files.length);
+    async.reject(files, function (file, callback) {
+        fs.exists(file.filepath, callback);
+    }, function (files) {
+        logger.info('Downloading %d files', files.length);
+        async.eachLimit(files, 1, function (file, callback) {
+            download(file.url, file.filepath, function (err) {
+                if (err)
+                    logger.error('Error downloading %s: %s', file.url, err);
+                callback();
+            });
+        }, callback);
+    });
 }
-var processEntries = function (entries, callback) {
+function processEntries(entries, callback) {
     /**
     callback: function(Error | null)
     */
@@ -207,10 +205,10 @@ var processEntries = function (entries, callback) {
             callback();
         });
     }, callback);
-};
-var main = function (callback) {
+}
+function downloadConferences(callback) {
     // getAllACLEntries('P', _.range(1979, 2015), function(err, entries)
-    var conferences_yaml = fs.readFileSync(path.join(__dirname, 'conferences.yaml'));
+    var conferences_yaml = fs.readFileSync(path.join(__dirname, 'conferences.yaml'), { encoding: 'utf8' });
     var conferences = js_yaml.load(conferences_yaml);
     var conference_keys = _.flatten(_.values(conferences));
     // conference_keys is something like ['P/P90', 'P/P91', ...]
@@ -239,5 +237,13 @@ var main = function (callback) {
         });
         // callback(null, entries);
     });
-};
-main(finalize);
+}
+if (require.main === module) {
+    // Actually running it:
+    logger.level = 'INFO';
+    downloadConferences(function (err) {
+        if (err)
+            throw err;
+        logger.info('DONE');
+    });
+}
