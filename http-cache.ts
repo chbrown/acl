@@ -1,4 +1,4 @@
-/// <reference path="typings/tsd.d.ts" />
+/// <reference path="types/all.d.ts" />
 
 import logger = require('loge');
 import redis = require('redis');

@@ -1,4 +1,4 @@
-/*jslint node: true */
+/// <reference path="types/all.d.ts" />
 
 var elasticsearch = require('elasticsearch');
 var client = new elasticsearch.Client({

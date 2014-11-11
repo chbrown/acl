@@ -1,4 +1,4 @@
-/// <reference path="typings/tsd.d.ts" />
+/// <reference path="types/all.d.ts" />
 var child_process = require('child_process');
 var logger = require('loge');
 function extract(pdf_filepath, txt_filepath, opts, callback) {
