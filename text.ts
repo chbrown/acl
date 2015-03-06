@@ -1,4 +1,4 @@
-/// <reference path="types/all.d.ts" />
+/// <reference path="type_declarations/index.d.ts" />
 
 import child_process = require('child_process');
 import logger = require('loge');

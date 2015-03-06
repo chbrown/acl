@@ -1,5 +1,4 @@
-/// <reference path="types/all.d.ts" />
-
+/// <reference path="type_declarations/index.d.ts" />
 import async = require('async');
 import fs = require('fs');
 import path = require('path');
@@ -12,9 +11,45 @@ import request = require('request');
 import htmlparser2 = require('htmlparser2');
 import DomlikeHandler = require('domlike/handler');
 import js_yaml = require('js-yaml');
+import redis = require('redis');
 
-import http_cache = require('./http-cache');
 import text = require('./text');
+
+function http_cache_get(url: string, callback: (err: Error, body?: string) => void) {
+  var redis_client = redis.createClient();
+
+  var done = function(err: Error, result?: string) {
+    redis_client.quit();
+    // escape redis's ugly exception-intercepting clutches
+    setImmediate(function() {
+      return callback(err, result);
+    });
+  };
+
+  redis_client.get(url, function(err, cached) {
+    if (err) return done(err);
+
+    if (cached) { //  && cached.length > 0
+      logger.debug('Retrieved %s from cache', url);
+      return done(null, cached);
+    }
+
+    request.get(url, function(err, response, body) {
+      if (err) return done(err);
+      if (response.statusCode != 200) {
+        logger.error('Non-200 response', response);
+      }
+
+      // expires in 6 hours
+      redis_client.setex(url, 6 * 60*60, body, function(err) {
+        if (err) return done(err);
+
+        logger.debug('Fetched %s from web', url);
+        done(null, body);
+      });
+    });
+  });
+};
 
 var anthology_root = '/Users/chbrown/github/acl-anthology';
 
@@ -232,7 +267,9 @@ function downloadEntries(entries: Array<ACLEntry>, callback: (err: Error) => voi
   logger.info('Found %d files', files.length);
 
   async.reject(files, function(file, callback) {
-    fs.exists(file.filepath, callback);
+    fs.exists(file.filepath, function(exists) {
+      callback(null, exists);
+    });
   }, function(files: Array<StoredWebFile>) { // it should be able to infer the type on files here
 
     logger.info('Downloading %d files', files.length);
@@ -291,7 +328,7 @@ function downloadConferences(callback: ErrorCallback) {
     var url = 'http://www.aclweb.org/anthology/' + conference_key + '/';
     // Fetch ACL page (potentially from cache) and return list of entries like:
     logger.info('Fetching: %s', url);
-    http_cache.get(url, function(err, html) {
+    http_cache_get(url, function(err, html) {
       if (err) return callback(err);
 
       getACLEntriesFromHtml(html, url, conference_key, callback);

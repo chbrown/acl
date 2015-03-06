@@ -1,4 +1,4 @@
-/// <reference path="types/all.d.ts" />
+/// <reference path="type_declarations/index.d.ts" />
 var fs = require('fs');
 var streaming = require('streaming');
 var logger = require('loge');
@@ -11,7 +11,7 @@ function addReference(reference, callback) {
     request.put({
         url: 'http://localhost:9200/acl/reference/' + reference.key,
         body: JSON.stringify(reference.toJSON()),
-        json: true
+        json: true,
     }, function (err, res, body) {
         callback(err, body);
     });

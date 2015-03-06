@@ -1,4 +1,4 @@
-/// <reference path="types/all.d.ts" />
+/// <reference path="type_declarations/index.d.ts" />
 var child_process = require('child_process');
 var logger = require('loge');
 function extract(pdf_filepath, txt_filepath, opts, callback) {
@@ -25,7 +25,7 @@ function extract(pdf_filepath, txt_filepath, opts, callback) {
     */
     // TODO: use opts if specified
     child_process.spawn('pdftotext', [pdf_filepath, txt_filepath, '-enc', 'UTF-8'], {
-        stdio: ['ignore', 'pipe', 'pipe']
+        stdio: ['ignore', 'pipe', 'pipe'],
     }).on('error', function (err) {
         callback(err);
     }).on('exit', function (code, signal) {

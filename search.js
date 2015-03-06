@@ -1,4 +1,4 @@
-/// <reference path="types/all.d.ts" />
+/// <reference path="type_declarations/index.d.ts" />
 var elasticsearch = require('elasticsearch');
 var client = new elasticsearch.Client({
     host: 'localhost:9200',

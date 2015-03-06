@@ -1,4 +1,4 @@
-/// <reference path="types/all.d.ts" />
+/// <reference path="type_declarations/index.d.ts" />
 var async = require('async');
 var fs = require('fs');
 var path = require('path');
@@ -10,7 +10,40 @@ var request = require('request');
 var htmlparser2 = require('htmlparser2');
 var DomlikeHandler = require('domlike/handler');
 var js_yaml = require('js-yaml');
-var http_cache = require('./http-cache');
+var redis = require('redis');
+function http_cache_get(url, callback) {
+    var redis_client = redis.createClient();
+    var done = function (err, result) {
+        redis_client.quit();
+        // escape redis's ugly exception-intercepting clutches
+        setImmediate(function () {
+            return callback(err, result);
+        });
+    };
+    redis_client.get(url, function (err, cached) {
+        if (err)
+            return done(err);
+        if (cached) {
+            logger.debug('Retrieved %s from cache', url);
+            return done(null, cached);
+        }
+        request.get(url, function (err, response, body) {
+            if (err)
+                return done(err);
+            if (response.statusCode != 200) {
+                logger.error('Non-200 response', response);
+            }
+            // expires in 6 hours
+            redis_client.setex(url, 6 * 60 * 60, body, function (err) {
+                if (err)
+                    return done(err);
+                logger.debug('Fetched %s from web', url);
+                done(null, body);
+            });
+        });
+    });
+}
+;
 var anthology_root = '/Users/chbrown/github/acl-anthology';
 function ensureFile(filepath, createFunction, callback) {
     /** if no file exists at `filepath`, call `ifMissingFunction(callback)`
@@ -168,7 +201,9 @@ function downloadEntries(entries, callback) {
     });
     logger.info('Found %d files', files.length);
     async.reject(files, function (file, callback) {
-        fs.exists(file.filepath, callback);
+        fs.exists(file.filepath, function (exists) {
+            callback(null, exists);
+        });
     }, function (files) {
         logger.info('Downloading %d files', files.length);
         async.eachLimit(files, 1, function (file, callback) {
@@ -218,7 +253,7 @@ function downloadConferences(callback) {
         var url = 'http://www.aclweb.org/anthology/' + conference_key + '/';
         // Fetch ACL page (potentially from cache) and return list of entries like:
         logger.info('Fetching: %s', url);
-        http_cache.get(url, function (err, html) {
+        http_cache_get(url, function (err, html) {
             if (err)
                 return callback(err);
             getACLEntriesFromHtml(html, url, conference_key, callback);
