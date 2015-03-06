@@ -5,15 +5,12 @@ import async = require('async');
 import fs = require('fs');
 import glob = require('glob');
 import path = require('path');
-import streaming = require('streaming');
 import logger = require('loge');
 import util = require('util');
 import request = require('request');
 
-import tex = require('tex');
-var bibtex = tex.bibtex;
-
-var anthology_root = '/Users/chbrown/github/acl-anthology';
+var streaming = require('streaming');
+var tex = require('tex');
 
 interface ReferenceTag {
   key: string;
@@ -23,9 +20,14 @@ interface ReferenceTag {
 interface Reference {
   type: string;
   key: string;
-  tags: Array<ReferenceTag>;
+  tags: ReferenceTag[];
 
   toJSON(): any;
+}
+
+interface File {
+  path: string;
+  stats: any;
 }
 
 function addReference(reference: Reference, callback: (err: Error, body?: string) => void) {
@@ -39,19 +41,13 @@ function addReference(reference: Reference, callback: (err: Error, body?: string
   });
 }
 
-interface File {
-  path: string;
-  stats: any;
-}
-
-// var index = 'acl';
-// var type = 'reference';
-
 function main(callback: ErrorCallback) {
   /** walks through all ./anthology/.../P##-####.bib files
   Parses them and adds them to the local elasticsearch server,
   using the given citekey as the document's _id
   */
+  var anthology_root = '/Users/chbrown/github/acl-anthology';
+
   new streaming.Walk(anthology_root)
   .pipe(new streaming.Filter(function(file: File) {
     // file has .path and .stats properties
@@ -61,7 +57,7 @@ function main(callback: ErrorCallback) {
     fs.readFile(file.path, {encoding: 'utf8'}, function(err: Error, bibtex_string: string) {
       if (err) return callback(err);
 
-      bibtex.parse(bibtex_string, function(err: Error, references: Array<Reference>) {
+      tex.bibtex.parse(bibtex_string, function(err: Error, references: Reference[]) {
         if (err) return callback(err);
         if (references.length === 0) {
           logger.error('No references in file: %s', file.path);

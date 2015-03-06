@@ -26,11 +26,13 @@
     "loge": "*",
     "mkdirp": "*",
     "optimist": "*",
+    "sqlcmd-pg": "*",
     "redis": "*",
     "regex-router": "*",
     "request": "*",
     "send": "*",
     "streaming": "*",
+    "tex": "*",
     "underscore": "*"
   }
 }

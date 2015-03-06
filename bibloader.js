@@ -1,11 +1,9 @@
 /// <reference path="type_declarations/index.d.ts" />
 var fs = require('fs');
-var streaming = require('streaming');
 var logger = require('loge');
 var request = require('request');
+var streaming = require('streaming');
 var tex = require('tex');
-var bibtex = tex.bibtex;
-var anthology_root = '/Users/chbrown/github/acl-anthology';
 function addReference(reference, callback) {
     //logger.info('adding reference: @%s: %s', reference.type, reference.key);
     request.put({
@@ -16,13 +14,12 @@ function addReference(reference, callback) {
         callback(err, body);
     });
 }
-// var index = 'acl';
-// var type = 'reference';
 function main(callback) {
     /** walks through all ./anthology/.../P##-####.bib files
     Parses them and adds them to the local elasticsearch server,
     using the given citekey as the document's _id
     */
+    var anthology_root = '/Users/chbrown/github/acl-anthology';
     new streaming.Walk(anthology_root).pipe(new streaming.Filter(function (file) {
         // file has .path and .stats properties
         return file.path.match(/\/\w\d{2}-\d{4}.bib$/); // && node.stats.isFile();
@@ -30,7 +27,7 @@ function main(callback) {
         fs.readFile(file.path, { encoding: 'utf8' }, function (err, bibtex_string) {
             if (err)
                 return callback(err);
-            bibtex.parse(bibtex_string, function (err, references) {
+            tex.bibtex.parse(bibtex_string, function (err, references) {
                 if (err)
                     return callback(err);
                 if (references.length === 0) {
