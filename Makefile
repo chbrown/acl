@@ -1,4 +1,4 @@
-TYPESCRIPT = $(wildcard *.ts)
+TYPESCRIPT = $(wildcard *.ts database/*.ts)
 
 all: $(TYPESCRIPT:%.ts=%.js)
 
