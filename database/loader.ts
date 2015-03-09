@@ -7,17 +7,10 @@ import path = require('path');
 import logger = require('loge');
 import util = require('util');
 import text = require('../text');
+import tex = require('tex');
 
 var streaming = require('streaming');
-var tex = require('tex');
-var sqlcmd = require('sqlcmd-pg');
-
-var db = new sqlcmd.Connection({
-  host: '127.0.0.1',
-  port: '5432',
-  user: 'postgres',
-  database: 'acl',
-});
+var db = require('./db');
 
 // setup logger
 // db.on('log', function(ev) {
@@ -27,37 +20,16 @@ var db = new sqlcmd.Connection({
 
 logger.level = 'info'; // info | debug
 
-function init(callback: (err: Error) => void) {
-  db.createDatabaseIfNotExists(function(err, exists) {
-    if (err) return callback(err);
-    var migrations_dirpath = path.join(__dirname, 'migrations');
-    db.executePatches('_migrations', migrations_dirpath, callback);
-  });
-}
-
-interface ReferenceTag {
-  key: string;
-  value: string;
-}
-
-interface Reference {
-  type: string;
-  key: string;
-  tags: ReferenceTag[];
-
-  toJSON(): any;
-}
-
 interface File {
   path: string;
   stats: fs.Stats;
 }
 
-function readBibfile(filepath: string, callback: (error: Error, reference?: Reference) => void) {
+function readBibfile(filepath: string, callback: (error: Error, reference?: tex.Reference) => void) {
   fs.readFile(filepath, {encoding: 'utf8'}, (error: Error, bibtex: string) => {
     if (error) return callback(error);
 
-    tex.bibtex.parse(bibtex, (error: Error, references: Reference[]) => {
+    tex.bibtex.parse(bibtex, (error: Error, references: tex.Reference[]) => {
       if (error) return callback(error);
 
       if (references.length === 0) {
@@ -74,7 +46,7 @@ function readBibfile(filepath: string, callback: (error: Error, reference?: Refe
 
 function addPaper(bib_filepath: string, pdf_filepath: string,
                   callback: (error: Error, result?: any) => void) {
-  readBibfile(bib_filepath, (error: Error, reference: Reference) => {
+  readBibfile(bib_filepath, (error: Error, reference: tex.Reference) => {
     if (error) {
       // skippable error
       return callback(null, {error: error.message});
@@ -151,7 +123,7 @@ function main(callback: (error: Error) => void) {
 }
 
 if (require.main === module) {
-  init(function(err) {
+  db.init(function(err) {
     if (err) throw err;
     main(function(err: Error) {
       if (err) throw err;

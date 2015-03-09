@@ -1,31 +1,16 @@
 /// <reference path="../type_declarations/index.d.ts" />
 var fs = require('fs');
-var path = require('path');
 var logger = require('loge');
 var text = require('../text');
-var streaming = require('streaming');
 var tex = require('tex');
-var sqlcmd = require('sqlcmd-pg');
-var db = new sqlcmd.Connection({
-    host: '127.0.0.1',
-    port: '5432',
-    user: 'postgres',
-    database: 'acl',
-});
+var streaming = require('streaming');
+var db = require('./db');
 // setup logger
 // db.on('log', function(ev) {
 //   var args = [ev.format].concat(ev.args);
 //   logger[ev.level].apply(logger, args);
 // });
 logger.level = 'info'; // info | debug
-function init(callback) {
-    db.createDatabaseIfNotExists(function (err, exists) {
-        if (err)
-            return callback(err);
-        var migrations_dirpath = path.join(__dirname, 'migrations');
-        db.executePatches('_migrations', migrations_dirpath, callback);
-    });
-}
 function readBibfile(filepath, callback) {
     fs.readFile(filepath, { encoding: 'utf8' }, function (error, bibtex) {
         if (error)
@@ -100,7 +85,7 @@ function main(callback) {
     }, { objectMode: true })).pipe(new streaming.json.Stringifier()).pipe(process.stdout);
 }
 if (require.main === module) {
-    init(function (err) {
+    db.init(function (err) {
         if (err)
             throw err;
         main(function (err) {
