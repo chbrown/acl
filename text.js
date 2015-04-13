@@ -2,6 +2,8 @@
 var child_process = require('child_process');
 var logger = require('loge');
 var streaming = require('streaming');
+var pdflib = require('pdf');
+pdflib.logger.level = 'debug'; // i.e., just above 'silly'
 /**
 Run Xpdf's pdftotext (e.g., v3.04) on the given pdf filepath.
 
@@ -26,7 +28,7 @@ other options:
 TODO: use opts if specified
 TODO: put the result in the given txt filepath if specified
 */
-function extract(pdf_filepath, callback) {
+function pdftotext(pdf_filepath, callback) {
     var args = ['-enc', 'UTF-8', pdf_filepath, '-'];
     logger.debug("$ pdftotext " + args.join(' '));
     var child = child_process.spawn('pdftotext', args, {
@@ -50,5 +52,20 @@ function extract(pdf_filepath, callback) {
         var output = Buffer.concat(chunks).toString('utf8');
         callback(null, output);
     });
+}
+exports.pdftotext = pdftotext;
+function extract(pdf_filepath, callback) {
+    logger.info("Opening " + pdf_filepath);
+    var pdf = pdflib.PDF.open(pdf_filepath);
+    var section_names = ['col1', 'col2'];
+    var document = pdf.getDocument(section_names);
+    var paragraphs = pdflib.Arrays.flatMap(document.getSections(), function (section) {
+        var paragraphs = section.getParagraphs();
+        var lines = paragraphs.map(function (paragraph) { return paragraph.toString(); });
+        return [("#" + section.header)].concat(lines);
+    });
+    logger.info("Extracted " + paragraphs.length + " paragraphs");
+    var body = paragraphs.join('\n');
+    setImmediate(function () { return callback(null, body); });
 }
 exports.extract = extract;

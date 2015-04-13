@@ -9,8 +9,6 @@ var db = new sqlcmd.Connection({
   database: 'acl',
 });
 
-logger.level = 'info'; // info | debug
-
 db.init = function(callback) {
   db.createDatabaseIfNotExists(function(err, exists) {
     if (err) return callback(err);

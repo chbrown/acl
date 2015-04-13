@@ -3,6 +3,9 @@ import child_process = require('child_process');
 import logger = require('loge');
 var streaming = require('streaming');
 
+var pdflib = require('pdf');
+pdflib.logger.level = 'debug'; // i.e., just above 'silly'
+
 interface ExtractOptions {
   f: number;
   l: number;
@@ -46,8 +49,8 @@ other options:
 TODO: use opts if specified
 TODO: put the result in the given txt filepath if specified
 */
-export function extract(pdf_filepath: string,
-                        callback: (error: Error, output?: string) => void) {
+export function pdftotext(pdf_filepath: string,
+                          callback: (error: Error, output?: string) => void) {
   var args = ['-enc', 'UTF-8', pdf_filepath, '-'];
   logger.debug(`$ pdftotext ${args.join(' ')}`);
   var child = child_process.spawn('pdftotext', args, {
@@ -76,4 +79,24 @@ export function extract(pdf_filepath: string,
     var output = Buffer.concat(chunks).toString('utf8');
     callback(null, output);
   });
+}
+
+export function extract(pdf_filepath: string,
+                        callback: ErrorResultCallback<string>) {
+  logger.info(`Opening ${pdf_filepath}`);
+  var pdf = pdflib.PDF.open(pdf_filepath);
+  var section_names = ['col1', 'col2'];
+  var document = pdf.getDocument(section_names);
+
+  var paragraphs = pdflib.Arrays.flatMap(document.getSections(), section => {
+    var paragraphs = section.getParagraphs();
+    var lines = paragraphs.map(paragraph => paragraph.toString());
+    return [`#${section.header}`].concat(lines);
+  });
+
+  logger.info(`Extracted ${paragraphs.length} paragraphs`);
+
+  var body = paragraphs.join('\n');
+
+  setImmediate(() => callback(null, body));
 }
