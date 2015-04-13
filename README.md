@@ -4,10 +4,15 @@
 
 * Similar; more broad: [AMiner](http://arnetminer.org/introduction)
 * Special focus: [Collection of Computer Science Bibliographies](http://liinwww.ira.uka.de/bibliography/)
+* Michigan's [ACL Anthology Network](http://clair.eecs.umich.edu/aan/index.php)
 
-## Install external TypeScript declarations
 
-    tsd reinstall -osr
+## Stats
+
+* There are 20,955 `???-????.bib` files in my current ACL collection.
+  - Somehow I only got 20,807 when iterating through. Good enough though.
+* There are 33,374 `???-????.pdf` files in the same collection.
+
 
 ## License
 
