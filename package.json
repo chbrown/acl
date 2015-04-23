@@ -26,14 +26,15 @@
     "lodash": "*",
     "loge": "*",
     "mkdirp": "*",
-    "optimist": "*",
-    "sqlcmd-pg": "*",
+    "pdfi": "*",
     "redis": "*",
     "regex-router": "*",
     "request": "*",
     "send": "*",
+    "sqlcmd-pg": "*",
     "streaming": "*",
     "tex": "*",
-    "underscore": "*"
+    "unorm": "*",
+    "yargs": "*"
   }
 }

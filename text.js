@@ -2,8 +2,8 @@
 var child_process = require('child_process');
 var logger = require('loge');
 var streaming = require('streaming');
-var pdflib = require('pdf');
-pdflib.logger.level = 'debug'; // i.e., just above 'silly'
+var pdfi = require('pdfi');
+pdfi.logger.level = 'warn';
 /**
 Run Xpdf's pdftotext (e.g., v3.04) on the given pdf filepath.
 
@@ -54,18 +54,18 @@ function pdftotext(pdf_filepath, callback) {
     });
 }
 exports.pdftotext = pdftotext;
-function extract(pdf_filepath, callback) {
-    logger.info("Opening " + pdf_filepath);
-    var pdf = pdflib.PDF.open(pdf_filepath);
-    var section_names = ['col1', 'col2'];
-    var document = pdf.getDocument(section_names);
-    var paragraphs = pdflib.Arrays.flatMap(document.getSections(), function (section) {
+/**
+Open the file with the pdf library, extract the text from col1 and col2,
+and return the paragraphs as an Array of strings.
+*/
+function extract(filepath) {
+    var pdf = pdfi.PDF.open(filepath);
+    var document = pdf.getDocument(['col1', 'col2']);
+    var paragraphs = pdfi.Arrays.flatMap(document.getSections(), function (section) {
         var paragraphs = section.getParagraphs();
         var lines = paragraphs.map(function (paragraph) { return paragraph.toString(); });
         return [("#" + section.header)].concat(lines);
     });
-    logger.info("Extracted " + paragraphs.length + " paragraphs");
-    var body = paragraphs.join('\n');
-    setImmediate(function () { return callback(null, body); });
+    return paragraphs;
 }
 exports.extract = extract;

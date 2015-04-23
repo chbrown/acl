@@ -3,8 +3,9 @@ import child_process = require('child_process');
 import logger = require('loge');
 var streaming = require('streaming');
 
-var pdflib = require('pdf');
-pdflib.logger.level = 'debug'; // i.e., just above 'silly'
+var pdfi = require('pdfi');
+pdfi.logger.level = 'warn';
+
 
 interface ExtractOptions {
   f: number;
@@ -81,22 +82,19 @@ export function pdftotext(pdf_filepath: string,
   });
 }
 
-export function extract(pdf_filepath: string,
-                        callback: ErrorResultCallback<string>) {
-  logger.info(`Opening ${pdf_filepath}`);
-  var pdf = pdflib.PDF.open(pdf_filepath);
-  var section_names = ['col1', 'col2'];
-  var document = pdf.getDocument(section_names);
+/**
+Open the file with the pdf library, extract the text from col1 and col2,
+and return the paragraphs as an Array of strings.
+*/
+export function extract(filepath: string): string[] {
+  var pdf = pdfi.PDF.open(filepath);
+  var document = pdf.getDocument(['col1', 'col2']);
 
-  var paragraphs = pdflib.Arrays.flatMap(document.getSections(), section => {
+  var paragraphs = pdfi.Arrays.flatMap(document.getSections(), section => {
     var paragraphs = section.getParagraphs();
     var lines = paragraphs.map(paragraph => paragraph.toString());
     return [`#${section.header}`].concat(lines);
   });
 
-  logger.info(`Extracted ${paragraphs.length} paragraphs`);
-
-  var body = paragraphs.join('\n');
-
-  setImmediate(() => callback(null, body));
+  return paragraphs;
 }
