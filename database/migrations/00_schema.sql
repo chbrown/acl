@@ -19,19 +19,12 @@ CREATE TABLE paper (
 );
 
 
-CREATE TABLE mention (
-  -- if the mentioning paper's text contains the mentioned paper's reference query, there will be a row in this table
-  mentioning_paper_id TEXT NOT NULL REFERENCES paper(id) ON DELETE CASCADE,
-  mentioned_paper_id TEXT NOT NULL REFERENCES paper(id) ON DELETE CASCADE,
-  PRIMARY KEY (mentioning_paper_id, mentioned_paper_id)
-);
-
 CREATE TABLE citation (
   citing_paper_id TEXT NOT NULL REFERENCES paper(id) ON DELETE CASCADE,
   cited_paper_id TEXT NOT NULL REFERENCES paper(id) ON DELETE CASCADE,
-  PRIMARY KEY (citing_paper_id, cited_paper_id)
+  PRIMARY KEY (citing_paper_id, cited_paper_id),
 
-  -- count INTEGER NOT NULL
+  count INTEGER NOT NULL
 );
 
 -- search functionality:
@@ -46,11 +39,12 @@ CREATE FUNCTION jointexts(VARIADIC TEXT[]) RETURNS TEXT AS
 ALTER TABLE paper ADD COLUMN reference_string TEXT;
 UPDATE paper SET reference_string = jointexts(author, year, title, booktitle, pages, publisher);
 
+-- text search index
+
 CREATE INDEX paper_reference_vector_idx ON paper USING gin(to_tsvector('simple', reference_string));
 
--- with trigrams
+-- trigram index
 
 CREATE EXTENSION pg_trgm;
-
 CREATE INDEX paper_reference_gin_trgm_idx ON paper USING gin(reference_string gin_trgm_ops);
 CREATE INDEX paper_reference_gist_trgm_idx ON paper USING gist(reference_string gist_trgm_ops);
