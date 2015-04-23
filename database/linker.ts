@@ -1,55 +1,30 @@
 /// <reference path="../type_declarations/index.d.ts" />
-import _ = require('lodash');
-import async = require('async');
-import chalk = require('chalk');
-import fs = require('fs');
-import path = require('path');
-import logger = require('loge');
-import util = require('util');
-import tex = require('tex');
+import * as _ from 'lodash';
+import * as async from 'async';
+import * as chalk from 'chalk';
+import * as logger from 'loge';
 
-import text = require('../text');
+import {Article, Paper, PaperRow} from '../models';
+import {File} from '../common';
 
 var streaming = require('streaming');
 var db = require('./db');
 
-interface File {
-  path: string;
-  stats: fs.Stats;
-}
-
-var punctuation = /[,.:!'"()&]/g;
-
-// interface (partially) matching the `paper` table in the PostgreSQL database
-interface Paper {
-  id: number;
-  // reference data:
-  pubtype: string;
-  year: string;
-  title: string;
-  booktitle: string;
-  author?: string;
-  citekey?: string;
-}
-
 function resolveReferenceParagraph(referenceParagraph: string,
-                                   callback: ErrorResultCallback<Paper>) {
+                                   callback: ErrorResultCallback<PaperRow>) {
   var select = db.Select('paper')
+  .add('*', 'reference_string <-> $QUERY AS distance')
   .where('reference_string % $QUERY')
-  // .where('reference_string <-> $QUERY < 0.6')
+  .where('reference_string <-> $QUERY < 0.65')
   .orderBy('reference_string <-> $QUERY')
   .limit(1);
 
   select.parameters.QUERY = referenceParagraph;
 
-  select.execute((error: Error, rows: Paper[]) => {
+  select.execute((error: Error, rows: PaperRow[]) => {
     if (error) return callback(error);
 
-    if (rows.length === 0) {
-      logger.info(`Found no papers matching ${chalk.red(referenceParagraph)}`);
-    }
-
-    callback(null, rows[0]);
+    callback(null, rows[0]); // rows[0] may be undefined
   });
 }
 
@@ -61,39 +36,30 @@ loadCitations iterates through all PDFs in the given directory (recursively), an
 3. resolves each reference plaintext to some paper in the database
 */
 function loadCitations(root: string, callback: ErrorCallback) {
-  new streaming.Walk(root)
-  .pipe(new streaming.Transformer((file: File, encoding, callback: ErrorResultCallback<any>) => {
-    var path_match = file.path.match(/\/(\w\d{2}-\d{4}).pdf$/)
-    // reject non-pdfs
-    if (path_match === null) {
-      return callback();
-    }
-    var id = path_match[1];
-
-    // Given a pdf's filepath, read it, parse it, and return the paragraphs as strings
-    logger.info(`extracting text from ${chalk.cyan(file.path)}`);
-    text.extract(file.path, (error, pdf_text) => {
-      if (error) return callback(error);
-
-      var pdf_paragraphs = pdf_text.split(/\n/);
-
-      logger.info(`extracted ${pdf_text.length} characters from ${file.path}`);
-      var references_index = pdf_paragraphs.indexOf('#References');
+  Article.stream(root).pipe(new streaming.Transformer((article: Article, encoding: string, callback: ErrorResultCallback<any>) => {
+    article.getParagraphs((error: Error, paragraphs: string[]) => {
+      var references_index = paragraphs.indexOf('#References');
       if (references_index > -1) {
-        var referenceParagraphs = pdf_paragraphs.slice(references_index + 1);
-        logger.info(`found ${chalk.green('#References')} at paragraph ${references_index} / ${pdf_paragraphs.length} (N=${referenceParagraphs.length})`);
+        var referenceParagraphs = paragraphs.slice(references_index + 1);
+        logger.info(`found ${chalk.green('#References')} at paragraph ${references_index} / ${paragraphs.length} (N=${referenceParagraphs.length})`);
 
-        async.map(referenceParagraphs, resolveReferenceParagraph, (error, papers: Paper[]) => {
+        async.map(referenceParagraphs, resolveReferenceParagraph, (error, resolvedPapers: PaperRow[]) => {
           if (error) return callback(error);
+
+          resolvedPapers.forEach((resolvedPaper, i) => {
+            var matchString = resolvedPaper ? new Paper(resolvedPaper).toReference() : 'N/A';
+            var matchDistance = resolvedPaper ? resolvedPaper['distance'] : '';
+            logger.debug(`  "${chalk.yellow(referenceParagraphs[i])}" -> ${chalk.green(matchString)} ${chalk.magenta(matchDistance)}`);
+          });
+
           // filter out the null resolved papers (no match)
-          papers = papers.filter(paper => !!paper);
-          logger.info(`Resolved ${chalk.yellow(papers.length)} out of ${chalk.yellow(referenceParagraphs.length)} references`);
+          var citedPapers = resolvedPapers.filter(paper => !!paper);
           // insert all the resolved matches as citations
-          async.each(papers, (cited_paper: Paper, callback: ErrorCallback) => {
+          async.each(citedPapers, (citedPaper: PaperRow, callback: ErrorCallback) => {
             db.Insert('citation')
             .set({
-              citing_paper_id: id,
-              cited_paper_id: cited_paper.id,
+              citing_paper_id: article.id,
+              cited_paper_id: citedPaper.id,
             })
             .execute(error => {
               // ignore unique constraint violations
@@ -104,13 +70,13 @@ function loadCitations(root: string, callback: ErrorCallback) {
             });
           }, (error) => {
             if (error) return callback(error);
-            callback(null, {citing_paper_id: id, cited_papers_ids: papers.map(paper => paper.id)});
+            callback(null, {citing_paper_id: article.id, cited_papers_ids: citedPapers.map(paper => paper.id)});
           });
         });
       }
       else {
         logger.info(`${chalk.red('found no "#References" paragraph')}`);
-        callback(null, {error: 'No "#References" paragraph detected', id: id});
+        callback(null, {error: 'No "#References" paragraph detected', id: article.id});
       }
     });
   }, {objectMode: true}))
